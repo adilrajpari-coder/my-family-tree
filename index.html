@@ -25,14 +25,16 @@
         body.dark-mode .zoom-controls button { background: #2c2c2c; color: #fff; border-color: #444; }
         body.dark-mode .zoom-controls button:hover { background: #444; }
         body.dark-mode .inlaw-badge { background: #333; color: #bbb; }
+        body.dark-mode .req-correction-msg { background: #3a3a3a !important; }
 
-        header { background: var(--white); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; z-index: 1000; transition: background 0.3s; }
+        header { background: var(--white); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; z-index: 1000; transition: background 0.3s; flex-wrap: wrap; gap: 15px;}
         .logo { font-size: 22px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); }
-        .header-controls { display: flex; gap: 10px; align-items: center; }
-        #search-input { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--line); width: 180px; }
+        .header-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end;}
+        #search-input { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--line); width: 160px; }
         #search-input:focus { outline: none; border-color: var(--primary); }
         
         .btn-apply { background: #ff9800; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .btn-correction { background: #2196f3; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-req { background: #e91e63; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-unlock { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-unlock.unlocked { background: #4CAF50; }
@@ -110,6 +112,7 @@
         .req-item { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; transition: background 0.3s, border-color 0.3s; }
         .req-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; }
         .req-actions { display: flex; gap: 10px; margin-top: 10px; }
+        .req-correction-msg { font-size:14px; background: rgba(0,0,0,0.05); padding:10px; border-radius:5px; margin-bottom:10px; white-space:pre-wrap; }
         
         .zoom-controls { position: fixed; bottom: 30px; left: 30px; display: flex; flex-direction: column; gap: 5px; z-index: 1000; }
         .zoom-controls button { width: 40px; height: 40px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: background 0.3s; }
@@ -122,7 +125,8 @@
         <div class="header-controls">
             <button id="theme-btn" class="btn-theme" onclick="toggleTheme()">🌙</button>
             <input type="text" id="search-input" placeholder="Search name..." onkeyup="handleSearch()">
-            <button class="btn-apply" onclick="openApplyModal()">Apply to Add</button>
+            <button class="btn-correction" onclick="openCorrectionModal()">Suggest Edit</button>
+            <button class="btn-apply" onclick="openApplyModal()">Join</button>
             <button id="req-btn" class="btn-req admin-only" onclick="document.getElementById('req-overlay').style.display='flex'">Requests (0)</button>
             <button id="auth-btn" class="btn-unlock" onclick="toggleSecurity()">Unlock Edits</button>
         </div>
@@ -290,13 +294,38 @@
         </div>
     </div>
 
+    <div id="correction-overlay" class="overlay">
+        <div class="modal" style="width: 400px;">
+            <h3 style="color: #2196F3;">Suggest an Edit</h3>
+            <p style="font-size: 13px; color: #888; margin-top: -10px;">Found a typo or missing date? Let the admin know!</p>
+            
+            <div class="form-group">
+                <label>Your Name</label>
+                <input type="text" id="corr-sender" placeholder="So we know who sent this">
+            </div>
+            <div class="form-group" style="margin-top:15px;">
+                <label>Who / What needs fixing?</label>
+                <input type="text" id="corr-target" placeholder="e.g., John Doe's Birth Year">
+            </div>
+            <div class="form-group" style="margin-top:15px;">
+                <label>Correction Details</label>
+                <textarea id="corr-details" rows="4" placeholder="Describe the correct information here..."></textarea>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="document.getElementById('correction-overlay').style.display='none'">Cancel</button>
+                <button class="btn-save" style="background:#2196F3;" onclick="submitCorrection()">Send Message</button>
+            </div>
+        </div>
+    </div>
+
     <div id="req-overlay" class="overlay">
         <div class="modal">
-            <h3>Pending Applications Inbox</h3>
+            <h3>Admin Dashboard: Requests & Edits</h3>
             <div id="req-list">
-                <p>Loading requests...</p>
+                <p>Loading inbox...</p>
             </div>
-            <button class="btn-cancel" style="width:100%; margin-top: 15px;" onclick="document.getElementById('req-overlay').style.display='none'">Close Inbox</button>
+            <button class="btn-cancel" style="width:100%; margin-top: 15px;" onclick="document.getElementById('req-overlay').style.display='none'">Close Dashboard</button>
         </div>
     </div>
 
@@ -310,6 +339,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database().ref('familyCloud');
         const reqDb = firebase.database().ref('pendingRequests');
+        const corrDb = firebase.database().ref('pendingCorrections'); // New DB for Corrections
 
         // --- 2. SECURITY, STATE & THEME ---
         const FAMILY_PASSWORD = "Aadil@22"; 
@@ -318,6 +348,7 @@
         let activeName = null;
         let formMode = ''; 
         let pendingRequests = {};
+        let pendingCorrections = {};
         let isDark = false;
 
         function toggleTheme() {
@@ -394,11 +425,23 @@
         // --- 4. CLOUD SYNC ---
         db.on('value', snap => { treeData = snap.val(); renderTree(); });
 
+        function updateBadgeCount() {
+            const count1 = Object.keys(pendingRequests).length;
+            const count2 = Object.keys(pendingCorrections).length;
+            const total = count1 + count2;
+            const reqBtn = document.getElementById('req-btn');
+            if(reqBtn) reqBtn.innerText = total > 0 ? `Inbox (${total}) 🔴` : `Inbox (0)`;
+        }
+
         reqDb.on('value', snap => {
             pendingRequests = snap.val() || {};
-            const count = Object.keys(pendingRequests).length;
-            const reqBtn = document.getElementById('req-btn');
-            if(reqBtn) reqBtn.innerText = count > 0 ? `Requests (${count}) 🔴` : `Requests (0)`;
+            updateBadgeCount();
+            renderRequestsList();
+        });
+
+        corrDb.on('value', snap => {
+            pendingCorrections = snap.val() || {};
+            updateBadgeCount();
             renderRequestsList();
         });
 
@@ -447,7 +490,6 @@
             const node = p.node;
             document.getElementById('p-name').innerText = node.name;
             
-            // Social Links Renderer
             let socialHtml = '';
             if (node.instagram) {
                 const igLink = node.instagram.includes('http') ? node.instagram : 'https://instagram.com/' + node.instagram.replace('@','');
@@ -489,35 +531,95 @@
             document.getElementById('profile-panel').classList.add('open');
         }
 
+        // --- NEW CORRECTION SYSTEM ---
+        function openCorrectionModal() {
+            document.getElementById('corr-sender').value = '';
+            document.getElementById('corr-target').value = '';
+            document.getElementById('corr-details').value = '';
+            document.getElementById('correction-overlay').style.display='flex';
+        }
+
+        function submitCorrection() {
+            const sender = document.getElementById('corr-sender').value;
+            const target = document.getElementById('corr-target').value;
+            const details = document.getElementById('corr-details').value;
+            
+            if(!sender || !details) { alert('Please fill in your name and the details of the correction.'); return; }
+            
+            corrDb.push({
+                sender: sender,
+                target: target,
+                details: details,
+                timestamp: Date.now()
+            });
+            
+            alert('Correction submitted! The admin has been notified.');
+            document.getElementById('correction-overlay').style.display='none';
+        }
+
+        function resolveCorrection(key) {
+            corrDb.child(key).remove();
+        }
+
+        // --- RENDER COMBINED ADMIN INBOX ---
         function renderRequestsList() {
             const list = document.getElementById('req-list');
             if(!list) return;
-            if(Object.keys(pendingRequests).length === 0) {
-                list.innerHTML = "<p style='color:#666; text-align:center;'>No pending applications. You are all caught up!</p>";
+            
+            const joinCount = Object.keys(pendingRequests).length;
+            const corrCount = Object.keys(pendingCorrections).length;
+
+            if(joinCount === 0 && corrCount === 0) {
+                list.innerHTML = "<p style='color:#888; text-align:center; margin-top:30px;'>Inbox is empty. You are all caught up!</p>";
                 return;
             }
 
             let html = "";
-            for(let key in pendingRequests) {
-                const req = pendingRequests[key];
-                html += `
-                <div class="req-item">
-                    <div class="req-header">
-                        <strong style="color:var(--primary);">${req.data.name}</strong> 
-                        <span style="color:#888; font-size:12px;">Wants to be added as</span> 
-                        <span style="color:var(--accent); font-weight:bold;">${req.relation.toUpperCase()}</span>
-                        <span style="color:#888; font-size:12px;">to</span>
-                        <strong style="color:var(--primary);">${req.target}</strong>
-                    </div>
-                    <div style="font-size:13px;">
-                        <b>Gender:</b> ${req.data.gender} | <b>City:</b> ${req.data.location || 'N/A'} | <b>Occupation:</b> ${req.data.occupation || 'N/A'}
-                    </div>
-                    <div class="req-actions">
-                        <button onclick="approveRequest('${key}')" style="background:green; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Approve & Add</button>
-                        <button onclick="rejectRequest('${key}')" style="background:#f44336; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Reject</button>
-                    </div>
-                </div>`;
+            
+            // 1. Render Join Requests
+            if(joinCount > 0) {
+                html += `<h4 style="color:var(--accent); border-bottom:1px solid #ccc; padding-bottom:5px;">New Join Requests</h4>`;
+                for(let key in pendingRequests) {
+                    const req = pendingRequests[key];
+                    html += `
+                    <div class="req-item">
+                        <div class="req-header">
+                            <strong style="color:var(--primary);">${req.data.name}</strong> 
+                            <span style="color:#888; font-size:12px;">Wants to be added as</span> 
+                            <span style="color:var(--accent); font-weight:bold;">${req.relation.toUpperCase()}</span>
+                            <span style="color:#888; font-size:12px;">to</span>
+                            <strong style="color:var(--primary);">${req.target}</strong>
+                        </div>
+                        <div style="font-size:13px;">
+                            <b>Gender:</b> ${req.data.gender} | <b>City:</b> ${req.data.location || 'N/A'}
+                        </div>
+                        <div class="req-actions">
+                            <button onclick="approveRequest('${key}')" style="background:green; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Approve & Add</button>
+                            <button onclick="rejectRequest('${key}')" style="background:#f44336; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Reject</button>
+                        </div>
+                    </div>`;
+                }
             }
+
+            // 2. Render Correction Messages
+            if(corrCount > 0) {
+                html += `<h4 style="color:#2196f3; border-bottom:1px solid #ccc; padding-bottom:5px; margin-top:25px;">Suggestions & Edits</h4>`;
+                for(let key in pendingCorrections) {
+                    const corr = pendingCorrections[key];
+                    html += `
+                    <div class="req-item" style="border-left: 5px solid #2196F3;">
+                        <div class="req-header" style="flex-direction:column; align-items:flex-start;">
+                            <div><strong style="color:#2196F3;">From: ${corr.sender}</strong></div>
+                            <div style="font-size:12px; color:#888; margin-top:3px;">Regarding: <strong>${corr.target || 'General'}</strong></div>
+                        </div>
+                        <div class="req-correction-msg">${corr.details}</div>
+                        <div class="req-actions">
+                            <button onclick="resolveCorrection('${key}')" style="background:#666; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Mark as Done / Dismiss</button>
+                        </div>
+                    </div>`;
+                }
+            }
+
             list.innerHTML = html;
         }
 
@@ -537,7 +639,7 @@
 
         function openApplyModal() {
             formMode = 'apply';
-            document.getElementById('modal-title').innerText = "Apply to Join Family Tree";
+            document.getElementById('modal-title').innerText = "Join the Tree";
             document.getElementById('relationship-inputs').style.display = 'block';
             document.getElementById('modal-save-btn').innerText = "Submit Application";
             clearForm();
