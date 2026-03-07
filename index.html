@@ -146,7 +146,8 @@
                 <img id="p-photo" src="" style="width:100%; height:100%; object-fit:cover;">
             </div>
             <h2 id="p-name" style="margin-bottom: 5px;"></h2>
-            <div id="p-social"></div> </div>
+            <div id="p-social"></div> 
+        </div>
 
         <div class="profile-data-grid" id="p-data-grid"></div>
 
@@ -162,7 +163,7 @@
         
         <h4 style="margin:15px 0 5px 0;">Photo Gallery</h4>
         <div id="p-gallery" class="gallery-grid"></div>
-        <button class="admin-only" onclick="addGalleryImg()" style="width:100%; padding:8px; margin-top:5px; cursor:pointer;">+ Add Photo URL</button>
+        <button class="admin-only" onclick="addGalleryImg()" style="width:100%; padding:8px; margin-top:5px; cursor:pointer;">+ Add Photo URL Manually</button>
         <button class="admin-only" onclick="syncUpdate()" style="width:100%; padding:15px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:20px; cursor:pointer; font-weight:bold;">Save Changes</button>
     </div>
 
@@ -261,8 +262,16 @@
             </div>
 
             <div class="form-section">
-                <h4>5. Social Media & Photos</h4>
+                <h4>5. Media & Social</h4>
                 <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Profile Image URL (Main Photo)</label>
+                        <input type="text" id="new-photo" placeholder="https://link-to-main-photo.jpg">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Gallery Photos (Press Enter to add multiple photo URLs)</label>
+                        <textarea id="new-gallery" rows="3" placeholder="https://link-to-gallery1.jpg&#10;https://link-to-gallery2.jpg"></textarea>
+                    </div>
                     <div class="form-group">
                         <label>Instagram Handle / URL</label>
                         <input type="text" id="new-insta" placeholder="@username">
@@ -270,10 +279,6 @@
                     <div class="form-group">
                         <label>Facebook Profile URL</label>
                         <input type="text" id="new-fb" placeholder="https://facebook.com/...">
-                    </div>
-                    <div class="form-group full-width">
-                        <label>Profile Image URL</label>
-                        <input type="text" id="new-photo" placeholder="https://link-to-photo.jpg">
                     </div>
                 </div>
             </div>
@@ -449,7 +454,8 @@
                 socialHtml += `<a href="${igLink}" target="_blank" style="color:#E1306C; text-decoration:none; font-weight:bold; margin-right: 10px;">📸 Instagram</a>`;
             }
             if (node.facebook) {
-                socialHtml += `<a href="${node.facebook}" target="_blank" style="color:#1877F2; text-decoration:none; font-weight:bold;">📘 Facebook</a>`;
+                const fbLink = node.facebook.includes('http') ? node.facebook : 'https://facebook.com/' + node.facebook;
+                socialHtml += `<a href="${fbLink}" target="_blank" style="color:#1877F2; text-decoration:none; font-weight:bold;">📘 Facebook</a>`;
             }
             document.getElementById('p-social').innerHTML = socialHtml;
 
@@ -518,7 +524,7 @@
         function approveRequest(key) {
             const req = pendingRequests[key];
             if(!req) return;
-            const newM = { ...req.data, bio:"", gallery:[], children:[], spouses:[] };
+            const newM = { gallery:[], ...req.data, bio:"", children:[], spouses:[] };
             injectIntoTree(newM, req.relation, req.target);
             reqDb.child(key).remove(); 
         }
@@ -547,10 +553,15 @@
             document.getElementById('modal-save-btn').innerText = "Save Changes";
             const p = findNodeAndParent(treeData, activeName).node;
             
-            const fields = ['name', 'blood', 'dob', 'birthplace', 'location', 'dod', 'occupation', 'education', 'photo', 'insta', 'fb'];
+            const fields = ['name', 'blood', 'dob', 'birthplace', 'location', 'dod', 'occupation', 'education', 'photo', 'insta', 'fb', 'gallery'];
             fields.forEach(f => {
                 const el = document.getElementById(`new-${f}`);
-                if(el) el.value = p[f === 'insta' ? 'instagram' : f === 'fb' ? 'facebook' : f] || "";
+                if(el) {
+                    if (f === 'insta') el.value = p.instagram || "";
+                    else if (f === 'fb') el.value = p.facebook || "";
+                    else if (f === 'gallery') el.value = p.gallery ? p.gallery.join('\n') : "";
+                    else el.value = p[f] || "";
+                }
             });
             document.getElementById('new-marriage-date').value = p.marriageDate || "";
             document.getElementById('gender').value = p.gender;
@@ -570,7 +581,7 @@
         }
 
         function clearForm() {
-            const fields = ['new-name', 'new-blood', 'new-dob', 'new-birthplace', 'new-location', 'new-dod', 'new-occupation', 'new-education', 'new-photo', 'new-insta', 'new-fb'];
+            const fields = ['new-name', 'new-blood', 'new-dob', 'new-birthplace', 'new-location', 'new-dod', 'new-occupation', 'new-education', 'new-photo', 'new-insta', 'new-fb', 'new-gallery'];
             fields.forEach(f => {
                 const el = document.getElementById(f);
                 if(el) el.value = '';
@@ -579,6 +590,9 @@
         }
 
         function getFormData() {
+            const galleryRaw = document.getElementById('new-gallery').value;
+            const galleryArray = galleryRaw ? galleryRaw.split('\n').map(l => l.trim()).filter(l => l !== '') : [];
+
             return {
                 name: document.getElementById('new-name').value,
                 gender: document.getElementById('gender').value,
@@ -592,7 +606,8 @@
                 education: document.getElementById('new-education').value,
                 photo: document.getElementById('new-photo').value,
                 instagram: document.getElementById('new-insta').value,
-                facebook: document.getElementById('new-fb').value
+                facebook: document.getElementById('new-fb').value,
+                gallery: galleryArray
             };
         }
 
@@ -632,7 +647,7 @@
             if(rel === 'husband' || rel === 'father') data.gender = 'male';
             if(rel === 'wife' || rel === 'mother') data.gender = 'female';
 
-            const newM = { ...data, bio:"", gallery:[], children:[], spouses:[] };
+            const newM = { gallery:[], ...data, bio:"", children:[], spouses:[] };
             const targetName = document.getElementById('parent-list').value;
             injectIntoTree(newM, rel, targetName);
             closeModal();
