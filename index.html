@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Legacy - Live Archive</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+    <style>
+        :root { --bg: #f9f8f2; --primary: #3e2723; --male: #2196f3; --female: #e91e63; --line: #d7ccc8; --white: #ffffff; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--primary); }
+        
+        header { background: var(--white); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1000; }
+        #search-input { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--line); width: 200px; }
+        #search-input:focus { outline: none; border-color: var(--primary); }
+
+        .tree { padding: 40px; display: flex; justify-content: center; min-height: 80vh;}
+        .tree ul { padding-top: 20px; position: relative; display: flex; justify-content: center; }
+        .tree li { list-style-type: none; position: relative; padding: 20px 5px 0 5px; text-align: center; }
+        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--line); width: 50%; height: 20px; }
+        .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--line); }
+        .tree li:only-child::after, .tree li:only-child::before { display: none; }
+        .tree li:only-child { padding-top: 0; }
+        .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
+        .tree li:last-child::before { border-right: 2px solid var(--line); border-radius: 0 5px 0 0; }
+        .tree li:first-child::after { border-radius: 5px 0 0 0; }
+        .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--line); width: 0; height: 20px; }
+
+        .member-card { background: var(--white); border: 1px solid var(--line); padding: 10px; border-radius: 12px; min-width: 100px; cursor: pointer; transition: 0.3s; display: inline-block; margin: 0 5px; }
+        .member-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .member-card.match { border: 2px solid var(--primary); box-shadow: 0 0 10px var(--primary); }
+        .photo-circle { width: 60px; height: 60px; border-radius: 50%; background: #eee; margin: 0 auto 5px; overflow: hidden; border: 3px solid #ddd; }
+        .photo-circle img { width: 100%; height: 100%; object-fit: cover; }
+        .border-male { border-color: var(--male) !important; }
+        .border-female { border-color: var(--female) !important; }
+
+        #profile-panel { position: fixed; top: 0; right: -420px; width: 400px; height: 100%; background: var(--white); box-shadow: -5px 0 20px rgba(0,0,0,0.1); transition: 0.4s; z-index: 2000; padding: 25px; overflow-y: auto; box-sizing: border-box; }
+        #profile-panel.open { right: 0; }
+        textarea { width: 100%; height: 150px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; padding: 10px; resize: none; box-sizing: border-box;}
+        .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        .gallery-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 5px; cursor: pointer; border: 1px solid #eee; }
+
+        #add-btn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: var(--primary); color: white; border: none; font-size: 30px; cursor: pointer; z-index: 1500; box-shadow: 0 4px 10px rgba(0,0,0,0.2);}
+        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
+        .modal { background: white; padding: 25px; border-radius: 15px; width: 320px; }
+        input, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo"><b>THE NEW WORLD: FAMILY ARCHIVE</b></div>
+        <input type="text" id="search-input" placeholder="Search name..." onkeyup="handleSearch()">
+    </header>
+
+    <div id="tree-display" class="tree">Connecting to Cloud...</div>
+
+    <button id="add-btn" onclick="openAddModal()">+</button>
+
+    <div id="profile-panel">
+        <button onclick="closeProfile()" style="font-size:30px; border:none; background:none; cursor:pointer; color:red;">×</button>
+        <div style="text-align: center;">
+            <div id="p-photo-border" style="width:120px; height:120px; border-radius:50%; border:5px solid #eee; margin:0 auto; overflow:hidden;">
+                <img id="p-photo" src="" style="width:100%; height:100%; object-fit:cover;">
+            </div>
+            <h2 id="p-name"></h2>
+            <p id="p-year"></p>
+        </div>
+        <hr>
+        <h3>Biography</h3>
+        <textarea id="p-bio" placeholder="Write their story here..."></textarea>
+        <h3>Gallery</h3>
+        <div id="p-gallery" class="gallery-grid"></div>
+        <button onclick="addGalleryImg()" style="width:100%; padding:8px; margin-top:5px; cursor:pointer;">+ Add Photo URL</button>
+        <button onclick="syncUpdate()" style="width:100%; padding:15px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:20px; cursor:pointer; font-weight:bold;">Save Changes</button>
+    </div>
+
+    <div id="modal-overlay">
+        <div class="modal">
+            <h3>Add New Member</h3>
+            
+            <select id="rel-type" onchange="updateFormUI()">
+                <option value="child">Child</option>
+                <option value="spouse">Spouse</option>
+                <option value="husband">Husband</option>
+                <option value="wife">Wife</option>
+                <option value="sibling">Sibling</option>
+                <option value="mother">Mother</option>
+                <option value="father">Father</option>
+                <option value="new" style="color:red; font-weight:bold;">NEW (Start fresh tree)</option>
+            </select>
+
+            <div id="parent-select-div">
+                <select id="parent-list"></select>
+            </div>
+
+            <select id="gender">
+                <option value="male">Male ♂</option>
+                <option value="female">Female ♀</option>
+            </select>
+            <input type="text" id="new-name" placeholder="Full Name">
+            <input type="text" id="new-year" placeholder="Birth Year">
+            <input type="text" id="new-photo" placeholder="Main Photo URL">
+            <button onclick="addNewMember()" style="width:100%; padding:12px; background:green; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:10px;">Add to Tree</button>
+            <button onclick="closeAddModal()" style="width:100%; background:none; border:none; color:grey; margin-top:10px; cursor:pointer;">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDux1tM6zqilPjzhGy8xSTNUmGZMMaOdGY",
+            databaseURL: "https://myfamilytree-57805-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "myfamilytree-57805"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database().ref('familyCloud');
+
+        let treeData = null;
+        let activeName = null;
+
+        // --- 2. CLOUD SYNC ---
+        db.on('value', snap => {
+            treeData = snap.val();
+            renderTree();
+        });
+
+        function renderTree() {
+            const container = document.getElementById('tree-display');
+            if(!treeData) { 
+                container.innerHTML = "<div style='text-align:center; padding-top:50px;'><h3>Your tree is empty</h3><p>Click the + button to add the first family member.</p></div>"; 
+                return; 
+            }
+            container.innerHTML = `<ul>${buildHtml(treeData)}</ul>`;
+            updateParentList();
+        }
+
+        function buildHtml(node) {
+            const gClass = node.gender === 'male' ? 'border-male' : 'border-female';
+            let html = `<li><div style="display:flex; justify-content:center; align-items:flex-start;">
+                        <div class="member-card" id="card-${node.name.replace(/\s/g,'')}" onclick="openProfile('${node.name}')">
+                            <div class="photo-circle ${gClass}"><img src="${node.photo || ''}" onerror="this.src='https://via.placeholder.com/60'"></div>
+                            <b>${node.name}</b>
+                        </div>`;
+            if(node.spouses) {
+                node.spouses.forEach(s => {
+                    const sgClass = s.gender === 'male' ? 'border-male' : 'border-female';
+                    html += `<div class="member-card" onclick="openProfile('${s.name}')">
+                             <div class="photo-circle ${sgClass}"><img src="${s.photo || ''}" onerror="this.src='https://via.placeholder.com/60'"></div>
+                             <b>${s.name}</b></div>`;
+                });
+            }
+            html += `</div>`;
+            if(node.children && node.children.length > 0) html += "<ul>" + node.children.map(buildHtml).join('') + "</ul>";
+            return html + "</li>";
+        }
+
+        // --- 3. SMART UI LOGIC ---
+        function updateFormUI() {
+            const rel = document.getElementById('rel-type').value;
+            const parentDiv = document.getElementById('parent-select-div');
+            const genderDrop = document.getElementById('gender');
+
+            if (rel === 'new') {
+                parentDiv.style.display = 'none';
+            } else {
+                parentDiv.style.display = 'block';
+            }
+
+            // Auto-lock gender for specific roles
+            if (rel === 'husband' || rel === 'father') {
+                genderDrop.value = 'male';
+                genderDrop.disabled = true;
+            } else if (rel === 'wife' || rel === 'mother') {
+                genderDrop.value = 'female';
+                genderDrop.disabled = true;
+            } else {
+                genderDrop.disabled = false;
+            }
+        }
+
+        // --- 4. DATA LOGIC ---
+        function openProfile(name) {
+            const p = findNodeAndParent(treeData, name);
+            if(!p) return;
+            activeName = name;
+            document.getElementById('p-name').innerText = p.node.name;
+            document.getElementById('p-year').innerText = "Birth: " + (p.node.year || "?");
+            document.getElementById('p-photo').src = p.node.photo || 'https://via.placeholder.com/150';
+            document.getElementById('p-bio').value = p.node.bio || "";
+            document.getElementById('p-photo-border').className = `border-${p.node.gender}`;
+            document.getElementById('p-photo-border').style.border = `5px solid var(--${p.node.gender})`;
+            
+            const gall = document.getElementById('p-gallery');
+            gall.innerHTML = (p.node.gallery || []).map(u => `<img src="${u}" class="gallery-img" onclick="window.open('${u}')">`).join('');
+            document.getElementById('profile-panel').classList.add('open');
+        }
+
+        function syncUpdate() {
+            const p = findNodeAndParent(treeData, activeName);
+            if(p) {
+                p.node.bio = document.getElementById('p-bio').value;
+                db.set(treeData); 
+            }
+            closeProfile();
+        }
+
+        function addGalleryImg() {
+            const u = prompt("Enter Image URL:");
+            if(u) {
+                const p = findNodeAndParent(treeData, activeName);
+                if(!p.node.gallery) p.node.gallery = [];
+                p.node.gallery.push(u); 
+                openProfile(activeName);
+                db.set(treeData);
+            }
+        }
+
+        function findNodeAndParent(node, name, parentNode = null, mainNode = null) {
+            if(!node) return null;
+            if(node.name === name) return { node: node, parent: parentNode, mainNode: mainNode };
+            
+            if(node.spouses) { 
+                let s = node.spouses.find(sp => sp.name === name); 
+                if(s) return { node: s, parent: parentNode, mainNode: node }; 
+            }
+            if(node.children) { 
+                for(let c of node.children) { 
+                    let r = findNodeAndParent(c, name, node, null); 
+                    if(r) return r; 
+                } 
+            }
+            return null;
+        }
+
+        function addNewMember() {
+            const name = document.getElementById('new-name').value;
+            const rel = document.getElementById('rel-type').value;
+            let gender = document.getElementById('gender').value;
+
+            if (!name) { alert("Please enter a name."); return; }
+
+            // Ensure locked genders are respected even if disabled
+            if(rel === 'husband' || rel === 'father') gender = 'male';
+            if(rel === 'wife' || rel === 'mother') gender = 'female';
+
+            const newM = { name, year: document.getElementById('new-year').value, photo: document.getElementById('new-photo').value, gender, bio:"", gallery:[], children:[], spouses:[] };
+
+            // 1. Handle NEW tree
+            if(rel === 'new' || !treeData) {
+                if(treeData && !confirm("WARNING: This will erase the current tree and start a new one. Are you sure?")) return;
+                db.set(newM);
+                closeAddModal();
+                clearForm();
+                return;
+            }
+
+            // Find target person
+            const targetName = document.getElementById('parent-list').value;
+            const found = findNodeAndParent(treeData, targetName);
+            if(!found) return;
+
+            const targetNode = found.node;
+            const targetParent = found.parent;
+            const mainNode = found.mainNode;
+
+            // 2. Handle Smart Relationships
+            if (rel === 'child') {
+                let actualParent = mainNode ? mainNode : targetNode; // If attached to spouse, put under main parent
+                if(!actualParent.children) actualParent.children = [];
+                actualParent.children.push(newM);
+            } 
+            else if (rel === 'spouse' || rel === 'husband' || rel === 'wife') {
+                let actualNode = mainNode ? mainNode : targetNode; // Prevent adding spouse to spouse
+                if(!actualNode.spouses) actualNode.spouses = [];
+                actualNode.spouses.push(newM);
+            }
+            else if (rel === 'sibling') {
+                if(!targetParent) {
+                    alert("Cannot add a sibling to the top person in the tree. Please add a Father/Mother first, then add this person as their child.");
+                    return;
+                }
+                if(!targetParent.children) targetParent.children = [];
+                targetParent.children.push(newM);
+            }
+            else if (rel === 'father' || rel === 'mother') {
+                if(!targetParent) {
+                    // Tree Expansion: New top root
+                    newM.children.push(treeData);
+                    treeData = newM;
+                } else {
+                    // Target has a parent, so add this new parent as a spouse to the existing parent
+                    if(!targetParent.spouses) targetParent.spouses = [];
+                    targetParent.spouses.push(newM);
+                }
+            }
+
+            db.set(treeData);
+            closeAddModal();
+            clearForm();
+        }
+
+        function clearForm() {
+            document.getElementById('new-name').value = '';
+            document.getElementById('new-year').value = '';
+            document.getElementById('new-photo').value = '';
+        }
+
+        function handleSearch() {
+            const q = document.getElementById('search-input').value.toLowerCase();
+            document.querySelectorAll('.member-card').forEach(c => c.classList.remove('match'));
+            if(!q) return;
+            document.querySelectorAll('.member-card').forEach(c => {
+                if(c.innerText.toLowerCase().includes(q)) c.classList.add('match');
+            });
+        }
+
+        function updateParentList() {
+            const s = document.getElementById('parent-list'); 
+            s.innerHTML = "";
+            if(!treeData) return;
+            
+            let names = [];
+            function walk(n) { 
+                if(!n) return; 
+                names.push(n.name); 
+                if(n.spouses) n.spouses.forEach(sp=>names.push(sp.name)); 
+                if(n.children) n.children.forEach(walk); 
+            }
+            walk(treeData); 
+            names.forEach(n => s.add(new Option(n, n)));
+        }
+
+        function openAddModal() { 
+            document.getElementById('modal-overlay').style.display='flex'; 
+            updateParentList(); 
+            updateFormUI();
+        }
+        function closeAddModal() { document.getElementById('modal-overlay').style.display='none'; }
+        function closeProfile() { document.getElementById('profile-panel').classList.remove('open'); }
+    </script>
+</body>
+</html>
