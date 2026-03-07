@@ -3,82 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Family Legacy - Live Archive</title>
+    <title>Rajpari Family - Live Archive</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
 
     <style>
-        :root { --bg: #f9f8f2; --primary: #3e2723; --male: #2196f3; --female: #e91e63; --line: #d7ccc8; --white: #ffffff; }
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--primary); overflow: hidden; } 
+        :root { --bg: #f9f8f2; --primary: #3e2723; --accent: #2e7d32; --male: #2196f3; --female: #e91e63; --line: #d7ccc8; --white: #ffffff; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 0; color: var(--primary); overflow: hidden; transition: background 0.3s, color 0.3s; } 
         
-        header { background: var(--white); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; z-index: 1000; }
-        .header-controls { display: flex; gap: 15px; align-items: center; }
+        /* --- DARK MODE STYLES --- */
+        body.dark-mode { --bg: #121212; --primary: #e0e0e0; --white: #1e1e1e; --line: #444; }
+        body.dark-mode .member-card { background: #1e1e1e; border-color: #444; color: #e0e0e0; }
+        body.dark-mode header { background: #1e1e1e; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        body.dark-mode .modal, body.dark-mode #profile-panel { background: #1e1e1e; color: #e0e0e0; }
+        body.dark-mode input, body.dark-mode select, body.dark-mode textarea { background: #2c2c2c; color: #fff; border-color: #555; }
+        body.dark-mode .req-item { background: #2c2c2c; border-color: #444; }
+        body.dark-mode .profile-data-grid { background: #2c2c2c; border-color: #444; }
+        body.dark-mode .data-val, body.dark-mode .edu-list { color: #ccc; }
+        body.dark-mode .data-label { color: #888; }
+        body.dark-mode .couple-box { background: rgba(255, 255, 255, 0.05); }
+        body.dark-mode .zoom-controls button { background: #2c2c2c; color: #fff; border-color: #444; }
+        body.dark-mode .zoom-controls button:hover { background: #444; }
+        body.dark-mode .inlaw-badge { background: #333; color: #bbb; }
+
+        header { background: var(--white); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); position: relative; z-index: 1000; transition: background 0.3s; }
+        .logo { font-size: 22px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--primary); }
+        .header-controls { display: flex; gap: 10px; align-items: center; }
         #search-input { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--line); width: 180px; }
         #search-input:focus { outline: none; border-color: var(--primary); }
+        
+        .btn-apply { background: #ff9800; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .btn-req { background: #e91e63; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-unlock { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-unlock.unlocked { background: #4CAF50; }
+        .btn-theme { background: none; border: none; font-size: 20px; cursor: pointer; padding: 5px; }
 
-        /* Drag & Zoom Container */
         #tree-viewport { width: 100vw; height: calc(100vh - 70px); cursor: grab; overflow: hidden; position: relative; }
         #tree-viewport:active { cursor: grabbing; }
         #tree-content { transform-origin: 0 0; position: absolute; padding: 100px; display: flex; justify-content: center; min-width: 100%; transition: transform 0.1s ease-out; }
 
         .tree ul { padding-top: 20px; position: relative; display: flex; justify-content: center; }
-        .tree li { list-style-type: none; position: relative; padding: 20px 5px 0 5px; text-align: center; }
-        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--line); width: 50%; height: 20px; }
+        .tree li { list-style-type: none; position: relative; padding: 20px 10px 0 10px; text-align: center; }
+        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid var(--line); width: 50%; height: 20px; transition: border-color 0.3s; }
         .tree li::after { right: auto; left: 50%; border-left: 2px solid var(--line); }
         .tree li:only-child::after, .tree li:only-child::before { display: none; }
         .tree li:only-child { padding-top: 0; }
         .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
         .tree li:last-child::before { border-right: 2px solid var(--line); border-radius: 0 5px 0 0; }
         .tree li:first-child::after { border-radius: 5px 0 0 0; }
-        .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--line); width: 0; height: 20px; }
+        .tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 2px solid var(--line); width: 0; height: 20px; transition: border-color 0.3s;}
 
-        .member-card { background: var(--white); border: 1px solid var(--line); padding: 10px; border-radius: 12px; min-width: 100px; cursor: pointer; transition: 0.3s; display: inline-block; margin: 0 5px; }
-        .member-card:hover { transform: translateY(-5px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .couple-box { display: inline-flex; align-items: center; justify-content: center; gap: 12px; border: 2px solid var(--primary); padding: 12px; border-radius: 12px; background: rgba(62, 39, 35, 0.04); position: relative; z-index: 2; transition: border-color 0.3s, background 0.3s;}
+        .single-box { display: inline-flex; position: relative; z-index: 2; }
+
+        .member-card { background: var(--white); border: 1px solid var(--line); padding: 10px; border-radius: 12px; min-width: 100px; cursor: pointer; transition: 0.3s; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .member-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
         .member-card.match { border: 2px solid var(--primary); box-shadow: 0 0 10px var(--primary); background: #fffde7; }
+        
+        .inlaw-badge { font-size: 10px; background: #eee; padding: 3px 6px; border-radius: 10px; margin-bottom: 6px; color: #555; font-weight: bold; white-space: nowrap;}
+        
         .photo-circle { width: 60px; height: 60px; border-radius: 50%; background: #eee; margin: 0 auto 5px; overflow: hidden; border: 3px solid #ddd; }
         .photo-circle img { width: 100%; height: 100%; object-fit: cover; }
         .border-male { border-color: var(--male) !important; }
         .border-female { border-color: var(--female) !important; }
 
-        #profile-panel { position: fixed; top: 0; right: -420px; width: 400px; height: 100%; background: var(--white); box-shadow: -5px 0 20px rgba(0,0,0,0.2); transition: 0.4s; z-index: 2000; padding: 25px; overflow-y: auto; box-sizing: border-box; }
+        #profile-panel { position: fixed; top: 0; right: -420px; width: 400px; height: 100%; background: var(--white); box-shadow: -5px 0 20px rgba(0,0,0,0.2); transition: right 0.4s, background 0.3s, color 0.3s; z-index: 2000; padding: 25px; overflow-y: auto; box-sizing: border-box; }
         #profile-panel.open { right: 0; }
-        textarea { width: 100%; height: 150px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; padding: 10px; resize: none; box-sizing: border-box;}
-        .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
+        
+        #p-social { margin-top: 10px; margin-bottom: 10px; font-size: 14px; }
+        .profile-data-grid { display: grid; grid-template-columns: 1fr; gap: 8px; text-align: left; margin-top: 15px; font-size: 14px; background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; transition: background 0.3s, border-color 0.3s;}
+        .data-row { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 5px; transition: border-color 0.3s;}
+        .data-row:last-child { border-bottom: none; padding-bottom: 0;}
+        .data-label { font-weight: bold; color: #666; width: 40%;}
+        .data-val { color: #222; width: 60%;}
+        .edu-list { margin: 5px 0 0 0; padding-left: 20px; color: #222; }
+
+        textarea { width: 100%; height: 120px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; padding: 10px; resize: none; box-sizing: border-box;}
+        .gallery-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
         .gallery-img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 5px; cursor: pointer; border: 1px solid #eee; }
 
-        /* Admin Controls */
         .admin-only { display: none; }
         #add-btn { position: fixed; bottom: 30px; right: 30px; width: 60px; height: 60px; border-radius: 50%; background: var(--primary); color: white; border: none; font-size: 30px; cursor: pointer; z-index: 1500; box-shadow: 0 4px 10px rgba(0,0,0,0.2);}
         
-        .action-btns { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-edit { background: #2196F3; color: white; border: none; padding: 8px; border-radius: 5px; flex: 1; cursor: pointer; }
-        .btn-delete { background: #f44336; color: white; border: none; padding: 8px; border-radius: 5px; flex: 1; cursor: pointer; }
+        .action-btns { display: flex; gap: 8px; margin-top: 15px; }
+        .btn-edit { background: #2196F3; color: white; border: none; padding: 8px; border-radius: 5px; flex: 1; cursor: pointer; font-size: 13px;}
+        .btn-add-rel { background: #ff9800; color: white; border: none; padding: 8px; border-radius: 5px; flex: 1; cursor: pointer; font-size: 13px; font-weight: bold;}
+        .btn-delete { background: #f44336; color: white; border: none; padding: 8px; border-radius: 5px; flex: 1; cursor: pointer; font-size: 13px;}
 
-        #modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; }
-        .modal { background: white; padding: 25px; border-radius: 15px; width: 320px; }
-        input, select { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 3000; justify-content: center; align-items: center; }
+        .modal { background: var(--white); padding: 30px; border-radius: 12px; width: 600px; max-width: 90vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.3); transition: background 0.3s, color 0.3s; }
+        .modal h3 { margin-top: 0; margin-bottom: 20px; color: var(--primary); border-bottom: 2px solid var(--line); padding-bottom: 10px; }
         
-        /* Zoom Controls */
+        .form-section { margin-bottom: 20px; }
+        .form-section h4 { margin: 0 0 10px 0; font-size: 14px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        .form-group { display: flex; flex-direction: column; text-align: left; }
+        .form-group.full-width { grid-column: span 2; }
+        .form-group label { font-size: 12px; font-weight: bold; color: #888; margin-bottom: 5px; }
+        .form-group input, .form-group select, .form-group textarea { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; outline: none; transition: border 0.2s; box-sizing: border-box;}
+        
+        .modal-actions { display: flex; gap: 15px; margin-top: 30px; position: sticky; bottom: -10px; background: inherit; padding-top: 15px; border-top: 1px solid var(--line);}
+        .btn-cancel { flex: 1; padding: 12px; background: #666; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-save { flex: 2; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+
+        .req-item { background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 8px; margin-bottom: 15px; transition: background 0.3s, border-color 0.3s; }
+        .req-header { display: flex; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; }
+        .req-actions { display: flex; gap: 10px; margin-top: 10px; }
+        
         .zoom-controls { position: fixed; bottom: 30px; left: 30px; display: flex; flex-direction: column; gap: 5px; z-index: 1000; }
-        .zoom-controls button { width: 40px; height: 40px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .zoom-controls button:hover { background: #eee; }
+        .zoom-controls button { width: 40px; height: 40px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: background 0.3s; }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="logo"><b>THE NEW WORLD: FAMILY ARCHIVE</b></div>
+        <div class="logo">RAJPARI FAMILY</div>
         <div class="header-controls">
+            <button id="theme-btn" class="btn-theme" onclick="toggleTheme()">🌙</button>
             <input type="text" id="search-input" placeholder="Search name..." onkeyup="handleSearch()">
+            <button class="btn-apply" onclick="openApplyModal()">Apply to Add</button>
+            <button id="req-btn" class="btn-req admin-only" onclick="document.getElementById('req-overlay').style.display='flex'">Requests (0)</button>
             <button id="auth-btn" class="btn-unlock" onclick="toggleSecurity()">Unlock Edits</button>
         </div>
     </header>
 
     <div id="tree-viewport">
-        <div id="tree-content" class="tree">
-            </div>
+        <div id="tree-content" class="tree"></div>
     </div>
 
     <div class="zoom-controls">
@@ -89,59 +140,158 @@
     <button id="add-btn" class="admin-only" onclick="openAddModal()">+</button>
 
     <div id="profile-panel">
-        <button onclick="closeProfile()" style="font-size:30px; border:none; background:none; cursor:pointer; color:red;">×</button>
-        <div style="text-align: center;">
-            <div id="p-photo-border" style="width:120px; height:120px; border-radius:50%; border:5px solid #eee; margin:0 auto; overflow:hidden;">
+        <button onclick="closeProfile()" style="font-size:30px; border:none; background:none; cursor:pointer; color:red; position: absolute; top:15px; right:20px;">×</button>
+        <div style="text-align: center; margin-top: 20px;">
+            <div id="p-photo-border" style="width:130px; height:130px; border-radius:50%; border:5px solid #eee; margin:0 auto; overflow:hidden;">
                 <img id="p-photo" src="" style="width:100%; height:100%; object-fit:cover;">
             </div>
-            <h2 id="p-name"></h2>
-            <p id="p-year"></p>
-        </div>
+            <h2 id="p-name" style="margin-bottom: 5px;"></h2>
+            <div id="p-social"></div> </div>
+
+        <div class="profile-data-grid" id="p-data-grid"></div>
 
         <div class="action-btns admin-only">
-            <button class="btn-edit" onclick="openEditModal()">Edit Info</button>
+            <button class="btn-edit" onclick="openEditModal()">Edit Data</button>
+            <button class="btn-add-rel" onclick="openAddFromProfile()">+ Relative</button>
             <button class="btn-delete" onclick="deleteProfile()">Delete</button>
         </div>
 
-        <hr>
-        <h3>Biography</h3>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid var(--line);">
+        <h4 style="margin:0 0 5px 0;">Biography & Notes</h4>
         <textarea id="p-bio" placeholder="Write their story here..." readonly></textarea>
-        <h3>Gallery</h3>
+        
+        <h4 style="margin:15px 0 5px 0;">Photo Gallery</h4>
         <div id="p-gallery" class="gallery-grid"></div>
         <button class="admin-only" onclick="addGalleryImg()" style="width:100%; padding:8px; margin-top:5px; cursor:pointer;">+ Add Photo URL</button>
         <button class="admin-only" onclick="syncUpdate()" style="width:100%; padding:15px; background:var(--primary); color:white; border:none; border-radius:8px; margin-top:20px; cursor:pointer; font-weight:bold;">Save Changes</button>
     </div>
 
-    <div id="modal-overlay">
+    <div id="modal-overlay" class="overlay">
         <div class="modal">
             <h3 id="modal-title">Add New Member</h3>
             
-            <div id="relationship-inputs">
-                <select id="rel-type" onchange="updateFormUI()">
-                    <option value="child">Child</option>
-                    <option value="spouse">Spouse</option>
-                    <option value="husband">Husband</option>
-                    <option value="wife">Wife</option>
-                    <option value="sibling">Sibling</option>
-                    <option value="mother">Mother</option>
-                    <option value="father">Father</option>
-                    <option value="new" style="color:red; font-weight:bold;">NEW (Erase & Start Fresh)</option>
-                </select>
-
-                <div id="parent-select-div">
-                    <select id="parent-list"></select>
+            <div class="form-section" id="relationship-inputs">
+                <h4>1. Tree Connection</h4>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Relationship Type</label>
+                        <select id="rel-type" onchange="updateFormUI()">
+                            <option value="child">Child</option>
+                            <option value="spouse">Spouse</option>
+                            <option value="husband">Husband</option>
+                            <option value="wife">Wife</option>
+                            <option value="sibling">Sibling</option>
+                            <option value="mother">Mother</option>
+                            <option value="father">Father</option>
+                            <option value="new" style="color:red; font-weight:bold;">NEW (Erase & Start Fresh)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="parent-select-div">
+                        <label>Connected To</label>
+                        <select id="parent-list"></select>
+                    </div>
                 </div>
             </div>
 
-            <select id="gender">
-                <option value="male">Male ♂</option>
-                <option value="female">Female ♀</option>
-            </select>
-            <input type="text" id="new-name" placeholder="Full Name">
-            <input type="text" id="new-year" placeholder="Birth Year">
-            <input type="text" id="new-photo" placeholder="Main Photo URL">
-            <button id="modal-save-btn" onclick="processForm()" style="width:100%; padding:12px; background:green; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:10px;">Save</button>
-            <button onclick="closeModal()" style="width:100%; background:none; border:none; color:grey; margin-top:10px; cursor:pointer;">Cancel</button>
+            <div class="form-section">
+                <h4>2. Personal Details</h4>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Full Name *</label>
+                        <input type="text" id="new-name" placeholder="First Last">
+                    </div>
+                    <div class="form-group">
+                        <label>Gender *</label>
+                        <select id="gender">
+                            <option value="male">Male ♂</option>
+                            <option value="female">Female ♀</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Blood Group</label>
+                        <select id="new-blood">
+                            <option value="">Unknown</option>
+                            <option value="A+">A+</option><option value="A-">A-</option>
+                            <option value="B+">B+</option><option value="B-">B-</option>
+                            <option value="O+">O+</option><option value="O-">O-</option>
+                            <option value="AB+">AB+</option><option value="AB-">AB-</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>3. Timeline & Locations</h4>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input type="date" id="new-dob">
+                    </div>
+                    <div class="form-group">
+                        <label>Birth Place</label>
+                        <input type="text" id="new-birthplace" placeholder="e.g., Mumbai, India">
+                    </div>
+                    <div class="form-group">
+                        <label>Current City / Country</label>
+                        <input type="text" id="new-location" placeholder="e.g., London, UK">
+                    </div>
+                    <div class="form-group">
+                        <label>Marriage Date</label>
+                        <input type="date" id="new-marriage-date">
+                    </div>
+                    <div class="form-group full-width" style="border-top: 1px dashed #ccc; padding-top: 10px; margin-top: 5px;">
+                        <label>Date of Death (If applicable)</label>
+                        <input type="date" id="new-dod">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>4. Career & Education</h4>
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Occupation</label>
+                        <input type="text" id="new-occupation" placeholder="e.g., Software Engineer">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Educational Centres (Press Enter for multiple entries)</label>
+                        <textarea id="new-education" rows="3" placeholder="Delhi Public School&#10;Mumbai University"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>5. Social Media & Photos</h4>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Instagram Handle / URL</label>
+                        <input type="text" id="new-insta" placeholder="@username">
+                    </div>
+                    <div class="form-group">
+                        <label>Facebook Profile URL</label>
+                        <input type="text" id="new-fb" placeholder="https://facebook.com/...">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Profile Image URL</label>
+                        <input type="text" id="new-photo" placeholder="https://link-to-photo.jpg">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+                <button class="btn-save" id="modal-save-btn" onclick="processForm()">Save Member</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="req-overlay" class="overlay">
+        <div class="modal">
+            <h3>Pending Applications Inbox</h3>
+            <div id="req-list">
+                <p>Loading requests...</p>
+            </div>
+            <button class="btn-cancel" style="width:100%; margin-top: 15px;" onclick="document.getElementById('req-overlay').style.display='none'">Close Inbox</button>
         </div>
     </div>
 
@@ -154,13 +304,27 @@
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database().ref('familyCloud');
+        const reqDb = firebase.database().ref('pendingRequests');
 
-        // --- 2. SECURITY & STATE ---
+        // --- 2. SECURITY, STATE & THEME ---
         const FAMILY_PASSWORD = "Aadil@22"; 
         let isAdmin = false;
         let treeData = null;
         let activeName = null;
-        let isEditingMode = false;
+        let formMode = ''; 
+        let pendingRequests = {};
+        let isDark = false;
+
+        function toggleTheme() {
+            isDark = !isDark;
+            if(isDark) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('theme-btn').innerText = '☀️';
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.getElementById('theme-btn').innerText = '🌙';
+            }
+        }
 
         function toggleSecurity() {
             if(isAdmin) {
@@ -171,7 +335,7 @@
                 applyAdminUI();
                 alert("Editing Locked. View Only Mode.");
             } else {
-                let attempt = prompt("Enter Family Password to unlock editing:");
+                let attempt = prompt("Enter Admin Password:");
                 if(attempt === FAMILY_PASSWORD) {
                     isAdmin = true;
                     document.getElementById('auth-btn').innerText = "Unlocked ✓";
@@ -186,9 +350,7 @@
 
         function applyAdminUI() {
             const elements = document.querySelectorAll('.admin-only');
-            elements.forEach(el => {
-                el.style.display = isAdmin ? 'block' : 'none';
-            });
+            elements.forEach(el => { el.style.display = isAdmin ? 'block' : 'none'; });
             if(isAdmin && document.querySelector('.action-btns')) {
                 document.querySelector('.action-btns').style.display = 'flex';
             }
@@ -200,20 +362,10 @@
         let scale = 1, panning = false, pointX = 0, pointY = 0, start = { x: 0, y: 0 };
 
         function setTransform() { content.style.transform = `translate(${pointX}px, ${pointY}px) scale(${scale})`; }
-        
-        viewport.onmousedown = function (e) {
-            e.preventDefault();
-            start = { x: e.clientX - pointX, y: e.clientY - pointY };
-            panning = true;
-        };
+        viewport.onmousedown = function (e) { e.preventDefault(); start = { x: e.clientX - pointX, y: e.clientY - pointY }; panning = true; };
         viewport.onmouseup = function () { panning = false; };
         viewport.onmouseleave = function () { panning = false; };
-        viewport.onmousemove = function (e) {
-            if (!panning) return;
-            pointX = (e.clientX - start.x);
-            pointY = (e.clientY - start.y);
-            setTransform();
-        };
+        viewport.onmousemove = function (e) { if (!panning) return; pointX = (e.clientX - start.x); pointY = (e.clientY - start.y); setTransform(); };
         viewport.onwheel = function (e) {
             e.preventDefault();
             let xs = (e.clientX - pointX) / scale, ys = (e.clientY - pointY) / scale;
@@ -223,47 +375,52 @@
             pointY = e.clientY - ys * scale;
             setTransform();
         };
-
         function zoom(amount) {
             let oldScale = scale;
             scale += amount;
             if(scale < 0.2) scale = 0.2;
-            let cx = viewport.clientWidth / 2;
-            let cy = viewport.clientHeight / 2;
-            let xs = (cx - pointX) / oldScale;
-            let ys = (cy - pointY) / oldScale;
+            let cx = viewport.clientWidth / 2, cy = viewport.clientHeight / 2;
+            let xs = (cx - pointX) / oldScale, ys = (cy - pointY) / oldScale;
             pointX = cx - xs * scale;
             pointY = cy - ys * scale;
             setTransform();
         }
 
-        // --- 4. CLOUD SYNC & RENDER ---
-        db.on('value', snap => {
-            treeData = snap.val();
-            renderTree();
+        // --- 4. CLOUD SYNC ---
+        db.on('value', snap => { treeData = snap.val(); renderTree(); });
+
+        reqDb.on('value', snap => {
+            pendingRequests = snap.val() || {};
+            const count = Object.keys(pendingRequests).length;
+            const reqBtn = document.getElementById('req-btn');
+            if(reqBtn) reqBtn.innerText = count > 0 ? `Requests (${count}) 🔴` : `Requests (0)`;
+            renderRequestsList();
         });
 
         function renderTree() {
-            if(!treeData) { 
-                content.innerHTML = "<div style='text-align:center; padding-top:50px;'><h3>Tree is empty</h3><p>Unlock edits to add the first person.</p></div>"; 
-                return; 
-            }
+            if(!treeData) { content.innerHTML = "<div style='text-align:center; padding-top:50px;'><h3>Archive is empty</h3><p>Unlock edits to add the first person.</p></div>"; return; }
             content.innerHTML = `<ul>${buildHtml(treeData)}</ul>`;
             updateParentList();
         }
 
         function buildHtml(node) {
             const gClass = node.gender === 'male' ? 'border-male' : 'border-female';
-            let html = `<li><div style="display:flex; justify-content:center; align-items:flex-start;">
-                        <div class="member-card" id="card-${node.name.replace(/\s/g,'')}" onclick="openProfile('${node.name}')">
-                            <div class="photo-circle ${gClass}"><img src="${node.photo || ''}" onerror="this.src='https://via.placeholder.com/60'"></div>
-                            <b>${node.name}</b>
-                        </div>`;
-            if(node.spouses) {
+            const hasSpouse = node.spouses && node.spouses.length > 0;
+            const wrapperClass = hasSpouse ? 'couple-box' : 'single-box';
+
+            let html = `<li><div class="${wrapperClass}">
+                <div class="member-card" id="card-${node.name.replace(/\s/g,'')}" onclick="openProfile('${node.name}')">
+                    <div class="photo-circle ${gClass}"><img src="${node.photo || ''}" onerror="this.src='https://via.placeholder.com/60'"></div>
+                    <b>${node.name}</b>
+                </div>`;
+                     
+            if(hasSpouse) {
                 node.spouses.forEach(s => {
                     const sgClass = s.gender === 'male' ? 'border-male' : 'border-female';
-                    html += `<div class="member-card" onclick="openProfile('${s.name}')">
-                             <div class="photo-circle ${sgClass}"><img src="${s.photo || ''}" onerror="this.src='https://via.placeholder.com/60'"></div>
+                    html += `<div class="member-card" onclick="openProfile('${s.name}')">`;
+                    if(s.parents && s.parents.length > 0) html += `<div class="inlaw-badge">Child of ${s.parents.map(p=>p.name).join(' & ')}</div>`;
+                    if(s.siblings && s.siblings.length > 0) html += `<div class="inlaw-badge">Sibling: ${s.siblings.map(sib=>sib.name).join(', ')}</div>`;
+                    html += `<div class="photo-circle ${sgClass}"><img src="${s.photo || ''}" onerror="this.src='https://via.placeholder.com/60'"></div>
                              <b>${s.name}</b></div>`;
                 });
             }
@@ -272,169 +429,306 @@
             return html + "</li>";
         }
 
-        // --- 5. PROFILE & EDITING LOGIC ---
+        function formatDate(dateString) {
+            if(!dateString) return "";
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            return new Date(dateString).toLocaleDateString(undefined, options);
+        }
+
         function openProfile(name) {
             const p = findNodeAndParent(treeData, name);
             if(!p) return;
             activeName = name;
-            document.getElementById('p-name').innerText = p.node.name;
-            document.getElementById('p-year').innerText = "Birth: " + (p.node.year || "?");
-            document.getElementById('p-photo').src = p.node.photo || 'https://via.placeholder.com/150';
-            document.getElementById('p-bio').value = p.node.bio || "";
-            document.getElementById('p-photo-border').className = `border-${p.node.gender}`;
-            document.getElementById('p-photo-border').style.border = `5px solid var(--${p.node.gender})`;
+            const node = p.node;
+            document.getElementById('p-name').innerText = node.name;
+            
+            // Social Links Renderer
+            let socialHtml = '';
+            if (node.instagram) {
+                const igLink = node.instagram.includes('http') ? node.instagram : 'https://instagram.com/' + node.instagram.replace('@','');
+                socialHtml += `<a href="${igLink}" target="_blank" style="color:#E1306C; text-decoration:none; font-weight:bold; margin-right: 10px;">📸 Instagram</a>`;
+            }
+            if (node.facebook) {
+                socialHtml += `<a href="${node.facebook}" target="_blank" style="color:#1877F2; text-decoration:none; font-weight:bold;">📘 Facebook</a>`;
+            }
+            document.getElementById('p-social').innerHTML = socialHtml;
+
+            let gridHtml = '';
+            if(node.dob) gridHtml += `<div class="data-row"><div class="data-label">Born</div><div class="data-val">${formatDate(node.dob)}</div></div>`;
+            if(node.birthplace) gridHtml += `<div class="data-row"><div class="data-label">Birth Place</div><div class="data-val">${node.birthplace}</div></div>`;
+            if(node.location) gridHtml += `<div class="data-row"><div class="data-label">Current City</div><div class="data-val">${node.location}</div></div>`;
+            if(node.blood) gridHtml += `<div class="data-row"><div class="data-label">Blood Group</div><div class="data-val" style="color:red; font-weight:bold;">${node.blood}</div></div>`;
+            if(node.occupation) gridHtml += `<div class="data-row"><div class="data-label">Occupation</div><div class="data-val">${node.occupation}</div></div>`;
+            if(node.marriageDate) gridHtml += `<div class="data-row"><div class="data-label">Marriage Date</div><div class="data-val">${formatDate(node.marriageDate)}</div></div>`;
+            if(node.dod) gridHtml += `<div class="data-row"><div class="data-label">Died</div><div class="data-val">${formatDate(node.dod)}</div></div>`;
+            
+            if(node.education) {
+                const eduArray = node.education.split('\n').filter(e => e.trim() !== '');
+                if(eduArray.length > 0) {
+                    let eduHtml = `<ul class="edu-list">` + eduArray.map(e => `<li>${e}</li>`).join('') + `</ul>`;
+                    gridHtml += `<div class="data-row" style="flex-direction:column;"><div class="data-label" style="width:100%">Education</div><div class="data-val" style="width:100%">${eduHtml}</div></div>`;
+                }
+            }
+            
+            const grid = document.getElementById('p-data-grid');
+            if(gridHtml === '') grid.style.display = 'none'; else { grid.style.display = 'grid'; grid.innerHTML = gridHtml; }
+            
+            document.getElementById('p-photo').src = node.photo || 'https://via.placeholder.com/150';
+            document.getElementById('p-bio').value = node.bio || "";
+            document.getElementById('p-photo-border').className = `border-${node.gender}`;
+            document.getElementById('p-photo-border').style.border = `5px solid var(--${node.gender})`;
             
             const gall = document.getElementById('p-gallery');
-            gall.innerHTML = (p.node.gallery || []).map(u => `<img src="${u}" class="gallery-img" onclick="window.open('${u}')">`).join('');
+            gall.innerHTML = (node.gallery || []).map(u => `<img src="${u}" class="gallery-img" onclick="window.open('${u}')">`).join('');
             document.getElementById('profile-panel').classList.add('open');
         }
 
-        function syncUpdate() {
-            if(!isAdmin) return alert("Please unlock editing first.");
-            const p = findNodeAndParent(treeData, activeName);
-            if(p) { p.node.bio = document.getElementById('p-bio').value; db.set(treeData); }
-            closeProfile();
+        function renderRequestsList() {
+            const list = document.getElementById('req-list');
+            if(!list) return;
+            if(Object.keys(pendingRequests).length === 0) {
+                list.innerHTML = "<p style='color:#666; text-align:center;'>No pending applications. You are all caught up!</p>";
+                return;
+            }
+
+            let html = "";
+            for(let key in pendingRequests) {
+                const req = pendingRequests[key];
+                html += `
+                <div class="req-item">
+                    <div class="req-header">
+                        <strong style="color:var(--primary);">${req.data.name}</strong> 
+                        <span style="color:#888; font-size:12px;">Wants to be added as</span> 
+                        <span style="color:var(--accent); font-weight:bold;">${req.relation.toUpperCase()}</span>
+                        <span style="color:#888; font-size:12px;">to</span>
+                        <strong style="color:var(--primary);">${req.target}</strong>
+                    </div>
+                    <div style="font-size:13px;">
+                        <b>Gender:</b> ${req.data.gender} | <b>City:</b> ${req.data.location || 'N/A'} | <b>Occupation:</b> ${req.data.occupation || 'N/A'}
+                    </div>
+                    <div class="req-actions">
+                        <button onclick="approveRequest('${key}')" style="background:green; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Approve & Add</button>
+                        <button onclick="rejectRequest('${key}')" style="background:#f44336; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Reject</button>
+                    </div>
+                </div>`;
+            }
+            list.innerHTML = html;
         }
 
-        function addGalleryImg() {
-            const u = prompt("Enter Image URL:");
-            if(u) {
-                const p = findNodeAndParent(treeData, activeName);
-                if(!p.node.gallery) p.node.gallery = [];
-                p.node.gallery.push(u); 
-                openProfile(activeName);
-                db.set(treeData);
+        function approveRequest(key) {
+            const req = pendingRequests[key];
+            if(!req) return;
+            const newM = { ...req.data, bio:"", gallery:[], children:[], spouses:[] };
+            injectIntoTree(newM, req.relation, req.target);
+            reqDb.child(key).remove(); 
+        }
+
+        function rejectRequest(key) {
+            if(confirm("Are you sure you want to discard this application?")) {
+                reqDb.child(key).remove();
             }
         }
 
-        function deleteProfile() {
-            if(!confirm(`WARNING: Are you sure you want to delete ${activeName}? This will also delete all their descendants and spouses!`)) return;
-            
-            const found = findNodeAndParent(treeData, activeName);
-            if(!found) return;
-
-            if(!found.parent && !found.mainNode) {
-                treeData = null; // Deleting the root
-            } else if (found.mainNode) {
-                // Deleting a spouse
-                found.mainNode.spouses = found.mainNode.spouses.filter(s => s.name !== activeName);
-            } else if (found.parent) {
-                // Deleting a child
-                found.parent.children = found.parent.children.filter(c => c.name !== activeName);
-            }
-            db.set(treeData);
-            closeProfile();
+        function openApplyModal() {
+            formMode = 'apply';
+            document.getElementById('modal-title').innerText = "Apply to Join Family Tree";
+            document.getElementById('relationship-inputs').style.display = 'block';
+            document.getElementById('modal-save-btn').innerText = "Submit Application";
+            clearForm();
+            updateParentList();
+            updateFormUI();
+            document.getElementById('modal-overlay').style.display='flex';
         }
 
         function openEditModal() {
-            isEditingMode = true;
-            document.getElementById('modal-title').innerText = "Edit Profile";
+            formMode = 'edit';
+            document.getElementById('modal-title').innerText = "Edit Details";
             document.getElementById('relationship-inputs').style.display = 'none'; 
             document.getElementById('modal-save-btn').innerText = "Save Changes";
-            
             const p = findNodeAndParent(treeData, activeName).node;
-            document.getElementById('new-name').value = p.name;
-            document.getElementById('new-year').value = p.year || "";
-            document.getElementById('new-photo').value = p.photo || "";
+            
+            const fields = ['name', 'blood', 'dob', 'birthplace', 'location', 'dod', 'occupation', 'education', 'photo', 'insta', 'fb'];
+            fields.forEach(f => {
+                const el = document.getElementById(`new-${f}`);
+                if(el) el.value = p[f === 'insta' ? 'instagram' : f === 'fb' ? 'facebook' : f] || "";
+            });
+            document.getElementById('new-marriage-date').value = p.marriageDate || "";
             document.getElementById('gender').value = p.gender;
             
             document.getElementById('modal-overlay').style.display='flex';
         }
 
         function openAddModal() {
-            isEditingMode = false;
-            document.getElementById('modal-title').innerText = "Add New Member";
+            formMode = 'add';
+            document.getElementById('modal-title').innerText = "Add New Entry";
             document.getElementById('relationship-inputs').style.display = 'block';
-            document.getElementById('modal-save-btn').innerText = "Add to Tree";
-            document.getElementById('new-name').value = '';
-            document.getElementById('new-year').value = '';
-            document.getElementById('new-photo').value = '';
-            
+            document.getElementById('modal-save-btn').innerText = "Directly Add Member";
+            clearForm();
             updateParentList();
             updateFormUI();
             document.getElementById('modal-overlay').style.display='flex';
         }
 
+        function clearForm() {
+            const fields = ['new-name', 'new-blood', 'new-dob', 'new-birthplace', 'new-location', 'new-dod', 'new-occupation', 'new-education', 'new-photo', 'new-insta', 'new-fb'];
+            fields.forEach(f => {
+                const el = document.getElementById(f);
+                if(el) el.value = '';
+            });
+            document.getElementById('new-marriage-date').value = '';
+        }
+
+        function getFormData() {
+            return {
+                name: document.getElementById('new-name').value,
+                gender: document.getElementById('gender').value,
+                blood: document.getElementById('new-blood').value,
+                dob: document.getElementById('new-dob').value,
+                birthplace: document.getElementById('new-birthplace').value,
+                location: document.getElementById('new-location').value,
+                marriageDate: document.getElementById('new-marriage-date').value,
+                dod: document.getElementById('new-dod').value,
+                occupation: document.getElementById('new-occupation').value,
+                education: document.getElementById('new-education').value,
+                photo: document.getElementById('new-photo').value,
+                instagram: document.getElementById('new-insta').value,
+                facebook: document.getElementById('new-fb').value
+            };
+        }
+
         function processForm() {
-            if(isEditingMode) saveEdit();
-            else addNewMember();
+            if(formMode === 'edit') saveEdit();
+            else if(formMode === 'apply') submitApplication();
+            else if(formMode === 'add') addNewMember();
+        }
+
+        function submitApplication() {
+            const data = getFormData();
+            const rel = document.getElementById('rel-type').value;
+            const target = document.getElementById('parent-list').value;
+            if (!data.name) { alert("Please enter your name."); return; }
+            if(rel === 'husband' || rel === 'father') data.gender = 'male';
+            if(rel === 'wife' || rel === 'mother') data.gender = 'female';
+
+            reqDb.push({ data: data, relation: rel, target: target, timestamp: Date.now() });
+            alert("Application Sent! The admin will review and approve your profile shortly.");
+            closeModal();
         }
 
         function saveEdit() {
             const found = findNodeAndParent(treeData, activeName);
             if(!found) return;
-            found.node.name = document.getElementById('new-name').value;
-            found.node.year = document.getElementById('new-year').value;
-            found.node.photo = document.getElementById('new-photo').value;
-            found.node.gender = document.getElementById('gender').value;
+            const data = getFormData();
+            Object.assign(found.node, data);
             db.set(treeData);
             closeModal();
             openProfile(found.node.name); 
         }
 
+        function addNewMember() {
+            const data = getFormData();
+            const rel = document.getElementById('rel-type').value;
+            if (!data.name) { alert("Please enter a name."); return; }
+            if(rel === 'husband' || rel === 'father') data.gender = 'male';
+            if(rel === 'wife' || rel === 'mother') data.gender = 'female';
+
+            const newM = { ...data, bio:"", gallery:[], children:[], spouses:[] };
+            const targetName = document.getElementById('parent-list').value;
+            injectIntoTree(newM, rel, targetName);
+            closeModal();
+        }
+
+        function injectIntoTree(newM, rel, targetName) {
+            if(rel === 'new' || !treeData) {
+                if(treeData && formMode === 'add' && !confirm("This erases current tree. Sure?")) return;
+                db.set(newM); return;
+            }
+
+            const found = findNodeAndParent(treeData, targetName);
+            if(!found) { alert("The target person cannot be found in the tree anymore."); return; }
+
+            const targetNode = found.node, targetParent = found.parent, mainNode = found.mainNode;
+
+            if (mainNode) { 
+                if (rel === 'child') { if(!mainNode.children) mainNode.children = []; mainNode.children.push(newM); } 
+                else if (rel === 'father' || rel === 'mother') { if(!targetNode.parents) targetNode.parents = []; targetNode.parents.push(newM); }
+                else if (rel === 'sibling') { if(!targetNode.siblings) targetNode.siblings = []; targetNode.siblings.push(newM); }
+                else { alert("You cannot add a spouse to a spouse."); return; }
+            } 
+            else {
+                if (rel === 'child') { if(!targetNode.children) targetNode.children = []; targetNode.children.push(newM); } 
+                else if (rel === 'spouse' || rel === 'husband' || rel === 'wife') { if(!targetNode.spouses) targetNode.spouses = []; targetNode.spouses.push(newM); }
+                else if (rel === 'sibling') { if(!targetParent) { alert("Cannot add sibling to root."); return; } if(!targetParent.children) targetParent.children = []; targetParent.children.push(newM); }
+                else if (rel === 'father' || rel === 'mother') { if(!targetParent) { newM.children = [treeData]; treeData = newM; } else { if(!targetParent.spouses) targetParent.spouses = []; targetParent.spouses.push(newM); } }
+            }
+            db.set(treeData);
+        }
+
         function findNodeAndParent(node, name, parentNode = null, mainNode = null) {
             if(!node) return null;
             if(node.name === name) return { node: node, parent: parentNode, mainNode: mainNode };
-            if(node.spouses) { let s = node.spouses.find(sp => sp.name === name); if(s) return { node: s, parent: parentNode, mainNode: node }; }
+            if(node.spouses) { 
+                for(let sp of node.spouses) {
+                    if(sp.name === name) return { node: sp, parent: parentNode, mainNode: node }; 
+                    if(sp.parents) { for(let p of sp.parents) if(p.name === name) return { node: p, parent: null, mainNode: sp }; }
+                    if(sp.siblings) { for(let sib of sp.siblings) if(sib.name === name) return { node: sib, parent: null, mainNode: sp }; }
+                }
+            }
             if(node.children) { for(let c of node.children) { let r = findNodeAndParent(c, name, node, null); if(r) return r; } }
             return null;
         }
 
-        function addNewMember() {
-            const name = document.getElementById('new-name').value;
-            const rel = document.getElementById('rel-type').value;
-            let gender = document.getElementById('gender').value;
-
-            if (!name) { alert("Please enter a name."); return; }
-            if(rel === 'husband' || rel === 'father') gender = 'male';
-            if(rel === 'wife' || rel === 'mother') gender = 'female';
-
-            const newM = { name, year: document.getElementById('new-year').value, photo: document.getElementById('new-photo').value, gender, bio:"", gallery:[], children:[], spouses:[] };
-
-            if(rel === 'new' || !treeData) {
-                if(treeData && !confirm("WARNING: This erases the current tree. Are you sure?")) return;
-                db.set(newM); closeModal(); return;
-            }
-
-            const targetName = document.getElementById('parent-list').value;
-            const found = findNodeAndParent(treeData, targetName);
+        function deleteProfile() {
+            if(!confirm(`Are you sure you want to delete ${activeName}?`)) return;
+            const found = findNodeAndParent(treeData, activeName);
             if(!found) return;
+            const node = found.node, parent = found.parent, mainNode = found.mainNode;
+            
+            let keepChildren = false;
+            if (node.children && node.children.length > 0) keepChildren = confirm(`${activeName} has descendants.\n\nClick OK to ONLY delete ${activeName} and move their children up the tree.\nClick CANCEL to completely wipe out ${activeName} AND all descendants.`);
 
-            const targetNode = found.node, targetParent = found.parent, mainNode = found.mainNode;
-
-            if (rel === 'child') {
-                let actualParent = mainNode ? mainNode : targetNode; 
-                if(!actualParent.children) actualParent.children = [];
-                actualParent.children.push(newM);
+            if(!parent && !mainNode) {
+                if(keepChildren && node.children && node.children.length > 0) {
+                    let newRoot = node.children[0]; 
+                    if(node.children.length > 1) { if(!newRoot.children) newRoot.children = []; for(let i=1; i<node.children.length; i++) newRoot.children.push(node.children[i]); }
+                    treeData = newRoot;
+                } else treeData = null; 
             } 
-            else if (rel === 'spouse' || rel === 'husband' || rel === 'wife') {
-                let actualNode = mainNode ? mainNode : targetNode; 
-                if(!actualNode.spouses) actualNode.spouses = [];
-                actualNode.spouses.push(newM);
-            }
-            else if (rel === 'sibling') {
-                if(!targetParent) { alert("Cannot add a sibling to the top root. Add parents first."); return; }
-                if(!targetParent.children) targetParent.children = [];
-                targetParent.children.push(newM);
-            }
-            else if (rel === 'father' || rel === 'mother') {
-                if(!targetParent) {
-                    newM.children = [treeData];
-                    treeData = newM;
-                } else {
-                    if(!targetParent.spouses) targetParent.spouses = [];
-                    targetParent.spouses.push(newM);
-                }
+            else if (mainNode && mainNode.parents && mainNode.parents.some(p => p.name === activeName)) { mainNode.parents = mainNode.parents.filter(p => p.name !== activeName); }
+            else if (mainNode && mainNode.siblings && mainNode.siblings.some(s => s.name === activeName)) { mainNode.siblings = mainNode.siblings.filter(s => s.name !== activeName); }
+            else if (mainNode) { mainNode.spouses = mainNode.spouses.filter(s => s.name !== activeName); } 
+            else if (parent) {
+                if (keepChildren && node.children) { if(!parent.children) parent.children = []; parent.children.push(...node.children); }
+                parent.children = parent.children.filter(c => c.name !== activeName);
             }
             db.set(treeData);
-            closeModal();
+            closeProfile();
+        }
+
+        function syncUpdate() {
+            if(!isAdmin) return;
+            const p = findNodeAndParent(treeData, activeName);
+            if(p) { p.node.bio = document.getElementById('p-bio').value; db.set(treeData); closeProfile(); }
+        }
+
+        function addGalleryImg() {
+            const u = prompt("Image URL:");
+            if(u) { const p = findNodeAndParent(treeData, activeName); if(!p.node.gallery) p.node.gallery = []; p.node.gallery.push(u); openProfile(activeName); db.set(treeData); }
+        }
+
+        function openAddFromProfile() {
+            openApplyModal(); 
+            const parentList = document.getElementById('parent-list');
+            if(parentList) parentList.value = activeName;
+            document.getElementById('rel-type').value = 'child';
+            updateFormUI();
+            closeProfile(); 
         }
 
         function updateFormUI() {
             const rel = document.getElementById('rel-type').value;
             const parentDiv = document.getElementById('parent-select-div');
             const genderDrop = document.getElementById('gender');
-
             parentDiv.style.display = (rel === 'new') ? 'none' : 'block';
             if (rel === 'husband' || rel === 'father') { genderDrop.value = 'male'; genderDrop.disabled = true; }
             else if (rel === 'wife' || rel === 'mother') { genderDrop.value = 'female'; genderDrop.disabled = true; }
@@ -447,13 +741,7 @@
             if(!q) return;
             let found = false;
             document.querySelectorAll('.member-card').forEach(c => {
-                if(c.innerText.toLowerCase().includes(q)) {
-                    c.classList.add('match');
-                    if(!found) {
-                        pointX = 0; pointY = 0; scale = 1; setTransform();
-                        found = true;
-                    }
-                }
+                if(c.innerText.toLowerCase().includes(q)) { c.classList.add('match'); if(!found) { pointX = 0; pointY = 0; scale = 1; setTransform(); found = true; } }
             });
         }
 
@@ -461,13 +749,23 @@
             const s = document.getElementById('parent-list'); s.innerHTML = "";
             if(!treeData) return;
             let names = [];
-            function walk(n) { if(!n) return; names.push(n.name); if(n.spouses) n.spouses.forEach(sp=>names.push(sp.name)); if(n.children) n.children.forEach(walk); }
+            function walk(n) { 
+                if(!n) return; 
+                names.push(n.name); 
+                if(n.spouses) {
+                    n.spouses.forEach(sp => {
+                        names.push(sp.name);
+                        if(sp.parents) sp.parents.forEach(p => names.push(p.name));
+                        if(sp.siblings) sp.siblings.forEach(sib => names.push(sib.name));
+                    });
+                }
+                if(n.children) n.children.forEach(walk); 
+            }
             walk(treeData); names.forEach(n => s.add(new Option(n, n)));
         }
 
         function closeModal() { document.getElementById('modal-overlay').style.display='none'; }
         function closeProfile() { document.getElementById('profile-panel').classList.remove('open'); }
-        
         applyAdminUI(); 
     </script>
 </body>
