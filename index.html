@@ -17,7 +17,7 @@
         body.dark-mode header { background: #1e1e1e; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
         body.dark-mode .modal, body.dark-mode #profile-panel { background: #1e1e1e; color: #e0e0e0; }
         body.dark-mode input, body.dark-mode select, body.dark-mode textarea { background: #2c2c2c; color: #fff; border-color: #555; }
-        body.dark-mode .req-item { background: #2c2c2c; border-color: #444; }
+        body.dark-mode .req-item, body.dark-mode .event-item { background: #2c2c2c; border-color: #444; }
         body.dark-mode .profile-data-grid { background: #2c2c2c; border-color: #444; }
         body.dark-mode .data-val, body.dark-mode .edu-list { color: #ccc; }
         body.dark-mode .data-label { color: #888; }
@@ -33,6 +33,7 @@
         #search-input { padding: 8px 20px; border-radius: 20px; border: 1px solid var(--line); width: 160px; }
         #search-input:focus { outline: none; border-color: var(--primary); }
         
+        .btn-events { background: #9c27b0; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-apply { background: #ff9800; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-correction { background: #2196f3; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
         .btn-req { background: #e91e63; color: white; border: none; padding: 8px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; }
@@ -114,6 +115,9 @@
         .req-actions { display: flex; gap: 10px; margin-top: 10px; }
         .req-correction-msg { font-size:14px; background: rgba(0,0,0,0.05); padding:10px; border-radius:5px; margin-bottom:10px; white-space:pre-wrap; }
         
+        /* Events Board Specific */
+        .event-item { background: #f9f9f9; border: 1px solid var(--line); padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; transition: background 0.3s, border-color 0.3s; }
+
         .zoom-controls { position: fixed; bottom: 30px; left: 30px; display: flex; flex-direction: column; gap: 5px; z-index: 1000; }
         .zoom-controls button { width: 40px; height: 40px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 20px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: background 0.3s; }
     </style>
@@ -125,6 +129,7 @@
         <div class="header-controls">
             <button id="theme-btn" class="btn-theme" onclick="toggleTheme()">🌙</button>
             <input type="text" id="search-input" placeholder="Search name..." onkeyup="handleSearch()">
+            <button class="btn-events" onclick="openEvents()">🎉 Events</button>
             <button class="btn-correction" onclick="openCorrectionModal()">Suggest Edit</button>
             <button class="btn-apply" onclick="openApplyModal()">Join</button>
             <button id="req-btn" class="btn-req admin-only" onclick="document.getElementById('req-overlay').style.display='flex'">Requests (0)</button>
@@ -319,6 +324,19 @@
         </div>
     </div>
 
+    <div id="events-overlay" class="overlay">
+        <div class="modal" style="width: 450px;">
+            <h3 style="color: #9c27b0;">🎉 Upcoming Family Events</h3>
+            <p style="font-size: 13px; color: #888; margin-top: -10px;">Birthdays and Anniversaries coming up soon!</p>
+            
+            <div id="events-list" style="margin-top: 20px; max-height: 50vh; overflow-y: auto;">
+                <p>Loading events...</p>
+            </div>
+            
+            <button class="btn-cancel" style="width:100%; margin-top: 15px;" onclick="document.getElementById('events-overlay').style.display='none'">Close Board</button>
+        </div>
+    </div>
+
     <div id="req-overlay" class="overlay">
         <div class="modal">
             <h3>Admin Dashboard: Requests & Edits</h3>
@@ -339,7 +357,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database().ref('familyCloud');
         const reqDb = firebase.database().ref('pendingRequests');
-        const corrDb = firebase.database().ref('pendingCorrections'); // New DB for Corrections
+        const corrDb = firebase.database().ref('pendingCorrections');
 
         // --- 2. SECURITY, STATE & THEME ---
         const FAMILY_PASSWORD = "Aadil@22"; 
@@ -531,7 +549,101 @@
             document.getElementById('profile-panel').classList.add('open');
         }
 
-        // --- NEW CORRECTION SYSTEM ---
+        // --- EVENTS CALENDAR SYSTEM ---
+        function openEvents() {
+            const list = document.getElementById('events-list');
+            if(!treeData) { 
+                list.innerHTML = "<p style='text-align:center; color:#888;'>Tree is empty. Add people to see upcoming events!</p>"; 
+                document.getElementById('events-overlay').style.display='flex'; 
+                return; 
+            }
+
+            let events = [];
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            let seenAnniversaries = new Set(); 
+
+            function walkEvents(n) { 
+                if(!n) return; 
+                
+                if(n.dob && !n.dod) { 
+                    events.push({ type: 'Birthday', date: n.dob, name: n.name });
+                }
+                if(n.marriageDate) {
+                    let annKey = n.marriageDate; 
+                    if(!seenAnniversaries.has(annKey)) {
+                        events.push({ type: 'Anniversary', date: n.marriageDate, name: n.name + " & Spouse" });
+                        seenAnniversaries.add(annKey);
+                    }
+                }
+
+                if(n.spouses) {
+                    n.spouses.forEach(sp => {
+                        if(sp.dob && !sp.dod) events.push({ type: 'Birthday', date: sp.dob, name: sp.name });
+                        if(sp.marriageDate) {
+                            let annKey = sp.marriageDate; 
+                            if(!seenAnniversaries.has(annKey)) {
+                                events.push({ type: 'Anniversary', date: sp.marriageDate, name: sp.name + " & Spouse" });
+                                seenAnniversaries.add(annKey);
+                            }
+                        }
+                        if(sp.parents) sp.parents.forEach(p => walkEvents(p));
+                        if(sp.siblings) sp.siblings.forEach(sib => walkEvents(sib));
+                    });
+                }
+                if(n.children) n.children.forEach(walkEvents); 
+            }
+            
+            walkEvents(treeData);
+
+            let upcoming = [];
+            events.forEach(ev => {
+                let evDate = new Date(ev.date);
+                if(isNaN(evDate)) return; 
+
+                let nextEvent = new Date(today.getFullYear(), evDate.getMonth(), evDate.getDate());
+                if (nextEvent < today) {
+                    nextEvent.setFullYear(today.getFullYear() + 1);
+                }
+
+                const diffTime = nextEvent - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                let years = nextEvent.getFullYear() - evDate.getFullYear();
+
+                upcoming.push({ ...ev, nextDate: nextEvent, days: diffDays, years: years });
+            });
+
+            upcoming.sort((a, b) => a.days - b.days);
+
+            let html = "";
+            if(upcoming.length === 0) {
+                html = "<p style='text-align:center; color:#888;'>No events found. Make sure to add Dates of Birth or Marriage Dates to profiles!</p>";
+            } else {
+                upcoming.slice(0, 15).forEach(ev => { // Show next 15 events
+                    let icon = ev.type === 'Birthday' ? '🎂' : '💍';
+                    let actionText = ev.type === 'Birthday' ? `Turning ${ev.years}` : `${ev.years} Year Anniversary`;
+                    let daysText = ev.days === 0 ? "<span style='color:green;'>TODAY!</span>" : ev.days === 1 ? "Tomorrow" : `In ${ev.days} days`;
+                    let dateStr = ev.nextDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+                    html += `
+                    <div class="event-item">
+                        <div>
+                            <div style="font-size:15px; margin-bottom:3px;">${icon} <b>${ev.name}</b></div>
+                            <div style="font-size:12px; color:#888;">${actionText} • ${dateStr}</div>
+                        </div>
+                        <div style="font-weight:bold; font-size:13px; text-align:right; color:var(--primary);">
+                            ${daysText}
+                        </div>
+                    </div>`;
+                });
+            }
+            list.innerHTML = html;
+            document.getElementById('events-overlay').style.display='flex';
+        }
+
+
+        // --- CORRECTION SYSTEM ---
         function openCorrectionModal() {
             document.getElementById('corr-sender').value = '';
             document.getElementById('corr-target').value = '';
@@ -546,13 +658,7 @@
             
             if(!sender || !details) { alert('Please fill in your name and the details of the correction.'); return; }
             
-            corrDb.push({
-                sender: sender,
-                target: target,
-                details: details,
-                timestamp: Date.now()
-            });
-            
+            corrDb.push({ sender: sender, target: target, details: details, timestamp: Date.now() });
             alert('Correction submitted! The admin has been notified.');
             document.getElementById('correction-overlay').style.display='none';
         }
@@ -576,7 +682,6 @@
 
             let html = "";
             
-            // 1. Render Join Requests
             if(joinCount > 0) {
                 html += `<h4 style="color:var(--accent); border-bottom:1px solid #ccc; padding-bottom:5px;">New Join Requests</h4>`;
                 for(let key in pendingRequests) {
@@ -601,7 +706,6 @@
                 }
             }
 
-            // 2. Render Correction Messages
             if(corrCount > 0) {
                 html += `<h4 style="color:#2196f3; border-bottom:1px solid #ccc; padding-bottom:5px; margin-top:25px;">Suggestions & Edits</h4>`;
                 for(let key in pendingCorrections) {
